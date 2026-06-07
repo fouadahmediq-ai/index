@@ -1837,6 +1837,24 @@ function updateSoundVol(val) {
 
 function testSound() { playBreakSound(); }
 
+
+// ── NOTIFICATION TIMING ──
+var notifMinutes = 5; // default
+
+function setNotifTime(mins, btn) {
+  notifMinutes = mins;
+  document.querySelectorAll('.sp-notif-chip').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('customNotifInput').value = '';
+}
+
+function applyCustomNotif() {
+  var val = parseInt(document.getElementById('customNotifInput').value);
+  if (!val || val < 1 || val > 60) return;
+  notifMinutes = val;
+  document.querySelectorAll('.sp-notif-chip').forEach(function(b){ b.classList.remove('active'); });
+}
+
 function toggleSoundPanel() {
   soundPanelOpen = !soundPanelOpen;
   document.getElementById('soundPanel').classList.toggle('open', soundPanelOpen);
