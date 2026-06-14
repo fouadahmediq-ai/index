@@ -1651,17 +1651,29 @@ function requestNotif() {
 }
 
 // ── LIVE STATUS ──
-function setLiveTab(tab, btn) {
-  liveTab = tab;
-  document.querySelectorAll('.lp-tab').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  renderLiveStatus();
+// ── helpers for shift end time ──
+function shiftEndStr(d) {
+  if (!d || !d.s) return '';
+  var parts = d.s.split(' - ');
+  return parts.length > 1 ? parts[1].trim() : '';
+}
+function shiftEndMins(d) {
+  var str = shiftEndStr(d);
+  return str ? timeToMins(str) : null;
 }
 
 function getAgentStatus(agent) {
   var d = agent.days[todayIdx()];
   if (!d || d.s === 'OFF' || d.s === 'VAC' || d.s === 'Training' || d.s === 'Shadowing' || d.s === 'Sick Leave') return {status:'off'};
+
   var now = nowMins();
+
+  // Shift already finished today
+  var end = shiftEndMins(d);
+  if (end !== null && now >= end) {
+    return {status:'done', label:'Shift ended ' + shiftEndStr(d)};
+  }
+
   var bkeys = ['b1','b2','b3','b4','b5'];
   var dur = BREAK_DUR;
   for (var i=0; i<bkeys.length; i++) {
@@ -1677,38 +1689,42 @@ function renderLiveStatus() {
   var agents = SCHEDULE.agents.filter(function(a){
     var d = a.days[todayIdx()];
     var isOff = !d || d.s==='OFF'||d.s==='VAC'||d.s==='Training'||d.s==='Shadowing'||d.s==='Sick Leave';
-    if (isOff) return false; // hide agents whose shift is done / off
+    if (isOff) return false; // only hide true days off / vacation / etc.
     if (liveTab === 'Morning') return a.team.indexOf('Morning') >= 0;
     if (liveTab === 'Evening') return a.team.indexOf('Evening') >= 0;
     return true;
   });
-  var online=0, onBreak=0;
+
+  var online=0, onBreak=0, done=0;
   var sorted = agents.slice().sort(function(a,b){
-    var o = {online:0,'on-break':1,off:2};
+    var o = {online:0,'on-break':1,'done':2,off:3};
     return o[getAgentStatus(a).status] - o[getAgentStatus(b).status];
   });
+
   var html = '';
   sorted.forEach(function(agent){
     var s = getAgentStatus(agent);
     if (s.status==='online') online++;
     else if (s.status==='on-break') onBreak++;
+    else if (s.status==='done') done++;
+
     var firstName = agent.name.split(' ')[0];
-    var sub = s.status==='on-break' ? s.label : agent.team;
-    html += '<div class="lp-chip '+s.status+'"><div class="lp-chip-dot '+s.status+'"></div><div><div class="lp-chip-name">'+firstName+'</div><div class="lp-chip-sub">'+sub+'</div></div></div>';
+    var sub = s.status==='on-break' ? s.label
+            : s.status==='done' ? s.label
+            : agent.team;
+    var icon = s.status==='done' ? '✓ ' : '';
+
+    html += '<div class="lp-chip '+s.status+'"><div class="lp-chip-dot '+s.status+'"></div><div><div class="lp-chip-name">'+icon+firstName+'</div><div class="lp-chip-sub">'+sub+'</div></div></div>';
   });
+
   document.getElementById('liveGrid').innerHTML = html || '<div style="color:var(--text3);font-size:12px;padding:8px;">No agents working now</div>';
   document.getElementById('liveCounts').innerHTML =
     '<span class="lp-count g">● '+online+' Online</span>'+
-    '<span class="lp-count o">● '+onBreak+' On Break</span>';
-  // Update nav pills
+    '<span class="lp-count o">● '+onBreak+' On Break</span>'+
+    '<span class="lp-count d">● '+done+' Shift Ended</span>';
+
   document.getElementById('navOnline').textContent = online;
   document.getElementById('navBreak').textContent = onBreak;
-}
-
-function startLiveStatus() {
-  renderLiveStatus();
-  if (liveTimer) clearInterval(liveTimer);
-  liveTimer = setInterval(renderLiveStatus, 30000);
 }
 
 // ── SOUND ──
